@@ -1,3 +1,4 @@
+<img width="1904" height="930" alt="Recording2026-08-10003829-ezgif com-optimize" src="https://github.com/user-attachments/assets/bc4aa14a-6d42-48da-9276-ab900f095927" />
 # 🤖 Robot Collision Detection and Response Simulator
 
 > A real-time 2D kinematic motion and 1D-track impulse physics simulator built in C++ using SFML.
