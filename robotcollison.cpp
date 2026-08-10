@@ -5,209 +5,170 @@
 #include <algorithm>
 
 // =====================================================================
-// Slider: draggable horizontal control
+// NOTE ON STYLE: This version avoids classes/OOP entirely.
+// The "structs" below are just plain data groupings (like a record) -
+// they have no functions inside them. All logic lives in separate
+// ordinary functions that take the data as parameters. This keeps
+// everything at the level of variables + functions, no OOP concepts.
 // =====================================================================
-class Slider {
-public:
-    Slider(sf::Vector2f pos, float width, float minVal, float maxVal,
-           float initialVal, const std::string& labelText, const std::string& unit = "m/s")
-        : position(pos), trackWidth(width),
-          minValue(minVal), maxValue(maxVal), value(initialVal),
-          label(labelText), unitLabel(unit), dragging(false)
-    {
-        track.setSize(sf::Vector2f(trackWidth, 6.f));
-        track.setPosition(position);
-        track.setFillColor(sf::Color(150, 150, 150));
 
-        handle.setRadius(9.f);
-        handle.setOrigin(9.f, 9.f);
-        handle.setFillColor(sf::Color(60, 130, 230));
-        handle.setOutlineThickness(2.f);
-        handle.setOutlineColor(sf::Color::Black);
-        updateHandlePosition();
-    }
-
-    void handleEvent(const sf::Event& event, sf::RenderWindow& window) {
-        if (event.type == sf::Event::MouseButtonPressed &&
-            event.mouseButton.button == sf::Mouse::Left) {
-            sf::Vector2f mousePos = window.mapPixelToCoords(
-                sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-            if (distance(mousePos, handle.getPosition()) < 14.f) dragging = true;
-        }
-        if (event.type == sf::Event::MouseButtonReleased &&
-            event.mouseButton.button == sf::Mouse::Left) {
-            dragging = false;
-        }
-        if (event.type == sf::Event::MouseMoved && dragging) {
-            sf::Vector2f mousePos = window.mapPixelToCoords(
-                sf::Vector2i(event.mouseMove.x, event.mouseMove.y));
-            float minX = position.x;
-            float maxX = position.x + trackWidth;
-            float clampedX = mousePos.x;
-            if (clampedX < minX) clampedX = minX;
-            if (clampedX > maxX) clampedX = maxX;
-            float t = (clampedX - position.x) / trackWidth;
-            value = minValue + t * (maxValue - minValue);
-            updateHandlePosition();
-        }
-    }
-
-    float getValue() const { return value; }
-    bool isDragging() const { return dragging; }
-
-    void setValue(float v) {
-        if (v < minValue) v = minValue;
-        if (v > maxValue) v = maxValue;
-        value = v;
-        updateHandlePosition();
-    }
-
-    void draw(sf::RenderWindow& window, const sf::Font* font) const {
-        window.draw(track);
-        window.draw(handle);
-        if (font) {
-            sf::Text text;
-            text.setFont(*font);
-            text.setCharacterSize(14);
-            text.setFillColor(sf::Color::White);
-            std::ostringstream ss;
-            ss.precision(2);
-            ss << std::fixed << label << ": " << value << " " << unitLabel;
-            text.setString(ss.str());
-            text.setPosition(position.x, position.y - 22.f);
-            window.draw(text);
-        }
-    }
-
-private:
-    sf::Vector2f position;
-    float trackWidth;
-    float minValue, maxValue, value;
-    std::string label;
-    std::string unitLabel;
+struct SliderData {
+    float x, y, width;
+    float minVal, maxVal, value;
     bool dragging;
-    sf::RectangleShape track;
-    sf::CircleShape handle;
-
-    void updateHandlePosition() {
-        float t = (value - minValue) / (maxValue - minValue);
-        handle.setPosition(position.x + t * trackWidth, position.y + 3.f);
-    }
-
-    static float distance(sf::Vector2f a, sf::Vector2f b) {
-        float dx = a.x - b.x, dy = a.y - b.y;
-        return std::sqrt(dx * dx + dy * dy);
-    }
+    std::string label;
+    std::string unit;
 };
 
-// =====================================================================
-// Button: simple clickable rectangle with a text label
-// =====================================================================
-class Button {
-public:
-    Button(sf::Vector2f pos, sf::Vector2f size, const std::string& labelText)
-        : position(pos), sizeVal(size), label(labelText), active(false)
-    {
-        box.setPosition(position);
-        box.setSize(sizeVal);
-        box.setOutlineThickness(2.f);
-        box.setOutlineColor(sf::Color::Black);
-        box.setFillColor(sf::Color(70, 70, 80));
-    }
-
-    bool isClicked(const sf::Event& event, sf::RenderWindow& window) const {
-        if (event.type != sf::Event::MouseButtonPressed ||
-            event.mouseButton.button != sf::Mouse::Left) return false;
-        sf::Vector2f mousePos = window.mapPixelToCoords(
-            sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-        return box.getGlobalBounds().contains(mousePos);
-    }
-
-    void setActive(bool a) { active = a; }
-    void setLabel(const std::string& l) { label = l; }
-
-    void draw(sf::RenderWindow& window, const sf::Font* font) const {
-        sf::RectangleShape drawBox = box;
-        drawBox.setFillColor(active ? sf::Color(60, 150, 90) : sf::Color(70, 70, 80));
-        window.draw(drawBox);
-        if (font) {
-            sf::Text text;
-            text.setFont(*font);
-            text.setCharacterSize(15);
-            text.setFillColor(sf::Color::White);
-            text.setString(label);
-            sf::FloatRect b = text.getLocalBounds();
-            text.setPosition(position.x + (sizeVal.x - b.width) / 2.f - b.left,
-                              position.y + (sizeVal.y - b.height) / 2.f - b.top);
-            window.draw(text);
-        }
-    }
-
-private:
-    sf::Vector2f position, sizeVal;
+struct ButtonData {
+    float x, y, width, height;
     std::string label;
     bool active;
-    sf::RectangleShape box;
 };
 
-// =====================================================================
-// IconButton: small square button that draws a play triangle or a
-// pause icon (two bars) depending on state - no font required
-// =====================================================================
-class IconButton {
-public:
-    IconButton(sf::Vector2f pos, float size) : position(pos), sizeVal(size) {
-        box.setPosition(position);
-        box.setSize(sf::Vector2f(sizeVal, sizeVal));
-        box.setFillColor(sf::Color(60, 60, 70));
-        box.setOutlineThickness(2.f);
-        box.setOutlineColor(sf::Color::Black);
-    }
+// ---------------------------------------------------------------------
+// Slider functions
+// ---------------------------------------------------------------------
+float sliderHandleX(const SliderData& s) {
+    float t = (s.value - s.minVal) / (s.maxVal - s.minVal);
+    return s.x + t * s.width;
+}
 
-    bool isClicked(const sf::Event& event, sf::RenderWindow& window) const {
-        if (event.type != sf::Event::MouseButtonPressed ||
-            event.mouseButton.button != sf::Mouse::Left) return false;
+void updateSlider(SliderData& s, const sf::Event& event, sf::RenderWindow& window) {
+    float handleY = s.y + 3.f;
+    float handleX = sliderHandleX(s);
+
+    if (event.type == sf::Event::MouseButtonPressed &&
+        event.mouseButton.button == sf::Mouse::Left) {
         sf::Vector2f mousePos = window.mapPixelToCoords(
             sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-        return box.getGlobalBounds().contains(mousePos);
+        float dx = mousePos.x - handleX;
+        float dy = mousePos.y - handleY;
+        if (std::sqrt(dx * dx + dy * dy) < 14.f) s.dragging = true;
     }
-
-    void draw(sf::RenderWindow& window, bool playing) const {
-        window.draw(box);
-        float cx = position.x + sizeVal / 2.f;
-        float cy = position.y + sizeVal / 2.f;
-
-        if (playing) {
-            // Pause icon: two vertical bars
-            sf::RectangleShape bar1(sf::Vector2f(5.f, sizeVal * 0.5f));
-            bar1.setFillColor(sf::Color::White);
-            bar1.setPosition(cx - 8.f, cy - sizeVal * 0.25f);
-            window.draw(bar1);
-
-            sf::RectangleShape bar2(sf::Vector2f(5.f, sizeVal * 0.5f));
-            bar2.setFillColor(sf::Color::White);
-            bar2.setPosition(cx + 3.f, cy - sizeVal * 0.25f);
-            window.draw(bar2);
-        } else {
-            // Play icon: right-pointing triangle
-            sf::ConvexShape triangle;
-            triangle.setPointCount(3);
-            triangle.setPoint(0, sf::Vector2f(cx - 8.f, cy - 10.f));
-            triangle.setPoint(1, sf::Vector2f(cx - 8.f, cy + 10.f));
-            triangle.setPoint(2, sf::Vector2f(cx + 10.f, cy));
-            triangle.setFillColor(sf::Color::White);
-            window.draw(triangle);
-        }
+    if (event.type == sf::Event::MouseButtonReleased &&
+        event.mouseButton.button == sf::Mouse::Left) {
+        s.dragging = false;
     }
+    if (event.type == sf::Event::MouseMoved && s.dragging) {
+        sf::Vector2f mousePos = window.mapPixelToCoords(
+            sf::Vector2i(event.mouseMove.x, event.mouseMove.y));
+        float clampedX = mousePos.x;
+        if (clampedX < s.x) clampedX = s.x;
+        if (clampedX > s.x + s.width) clampedX = s.x + s.width;
+        float t = (clampedX - s.x) / s.width;
+        s.value = s.minVal + t * (s.maxVal - s.minVal);
+    }
+}
 
-private:
-    sf::Vector2f position;
-    float sizeVal;
-    sf::RectangleShape box;
-};
+void drawSlider(sf::RenderWindow& window, const SliderData& s, sf::Font& font, bool fontLoaded) {
+    sf::RectangleShape track(sf::Vector2f(s.width, 6.f));
+    track.setPosition(s.x, s.y);
+    track.setFillColor(sf::Color(150, 150, 150));
+    window.draw(track);
 
-// Draws a horizontal arrow starting at (x, y), pointing right if vel > 0,
-// left if vel < 0. Length scales with |vel|. Does nothing if vel == 0.
+    sf::CircleShape handle(9.f);
+    handle.setOrigin(9.f, 9.f);
+    handle.setFillColor(sf::Color(60, 130, 230));
+    handle.setOutlineThickness(2.f);
+    handle.setOutlineColor(sf::Color::Black);
+    handle.setPosition(sliderHandleX(s), s.y + 3.f);
+    window.draw(handle);
+
+    if (fontLoaded) {
+        sf::Text text;
+        text.setFont(font);
+        text.setCharacterSize(14);
+        text.setFillColor(sf::Color::White);
+        std::ostringstream ss;
+        ss.precision(2);
+        ss << std::fixed << s.label << ": " << s.value << " " << s.unit;
+        text.setString(ss.str());
+        text.setPosition(s.x, s.y - 22.f);
+        window.draw(text);
+    }
+}
+
+// ---------------------------------------------------------------------
+// Button functions
+// ---------------------------------------------------------------------
+bool isButtonClicked(const ButtonData& b, const sf::Event& event, sf::RenderWindow& window) {
+    if (event.type != sf::Event::MouseButtonPressed ||
+        event.mouseButton.button != sf::Mouse::Left) return false;
+    sf::Vector2f mousePos = window.mapPixelToCoords(
+        sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+    return mousePos.x >= b.x && mousePos.x <= b.x + b.width &&
+           mousePos.y >= b.y && mousePos.y <= b.y + b.height;
+}
+
+void drawButton(sf::RenderWindow& window, const ButtonData& b, sf::Font& font, bool fontLoaded) {
+    sf::RectangleShape box(sf::Vector2f(b.width, b.height));
+    box.setPosition(b.x, b.y);
+    box.setFillColor(b.active ? sf::Color(60, 150, 90) : sf::Color(70, 70, 80));
+    box.setOutlineThickness(2.f);
+    box.setOutlineColor(sf::Color::Black);
+    window.draw(box);
+
+    if (fontLoaded) {
+        sf::Text text;
+        text.setFont(font);
+        text.setCharacterSize(15);
+        text.setFillColor(sf::Color::White);
+        text.setString(b.label);
+        sf::FloatRect tb = text.getLocalBounds();
+        text.setPosition(b.x + (b.width - tb.width) / 2.f - tb.left,
+                          b.y + (b.height - tb.height) / 2.f - tb.top);
+        window.draw(text);
+    }
+}
+
+// ---------------------------------------------------------------------
+// Play/pause icon button (drawn as a triangle or two bars, no font needed)
+// ---------------------------------------------------------------------
+bool isIconButtonClicked(float x, float y, float size, const sf::Event& event, sf::RenderWindow& window) {
+    if (event.type != sf::Event::MouseButtonPressed ||
+        event.mouseButton.button != sf::Mouse::Left) return false;
+    sf::Vector2f mousePos = window.mapPixelToCoords(
+        sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+    return mousePos.x >= x && mousePos.x <= x + size &&
+           mousePos.y >= y && mousePos.y <= y + size;
+}
+
+void drawIconButton(sf::RenderWindow& window, float x, float y, float size, bool playing) {
+    sf::RectangleShape box(sf::Vector2f(size, size));
+    box.setPosition(x, y);
+    box.setFillColor(sf::Color(60, 60, 70));
+    box.setOutlineThickness(2.f);
+    box.setOutlineColor(sf::Color::Black);
+    window.draw(box);
+
+    float cx = x + size / 2.f;
+    float cy = y + size / 2.f;
+
+    if (playing) {
+        sf::RectangleShape bar1(sf::Vector2f(5.f, size * 0.5f));
+        bar1.setFillColor(sf::Color::White);
+        bar1.setPosition(cx - 8.f, cy - size * 0.25f);
+        window.draw(bar1);
+
+        sf::RectangleShape bar2(sf::Vector2f(5.f, size * 0.5f));
+        bar2.setFillColor(sf::Color::White);
+        bar2.setPosition(cx + 3.f, cy - size * 0.25f);
+        window.draw(bar2);
+    } else {
+        sf::ConvexShape triangle;
+        triangle.setPointCount(3);
+        triangle.setPoint(0, sf::Vector2f(cx - 8.f, cy - 10.f));
+        triangle.setPoint(1, sf::Vector2f(cx - 8.f, cy + 10.f));
+        triangle.setPoint(2, sf::Vector2f(cx + 10.f, cy));
+        triangle.setFillColor(sf::Color::White);
+        window.draw(triangle);
+    }
+}
+
+// ---------------------------------------------------------------------
+// Velocity arrow above each robot
+// ---------------------------------------------------------------------
 void drawVelocityArrow(sf::RenderWindow& window, float x, float y, float vel, sf::Color color) {
     if (std::fabs(vel) < 0.05f) return;
     float length = std::fabs(vel) * 18.f;
@@ -229,8 +190,9 @@ void drawVelocityArrow(sf::RenderWindow& window, float x, float y, float vel, sf
     window.draw(head);
 }
 
-// Draws a fading spark burst at (x, y). progress goes from 0 (moment of
-// impact) to 1 (fully faded out).
+// ---------------------------------------------------------------------
+// Collision spark burst animation
+// ---------------------------------------------------------------------
 void drawImpactEffect(sf::RenderWindow& window, float x, float y, float progress) {
     if (progress >= 1.f) return;
     sf::Uint8 alpha = static_cast<sf::Uint8>(255.f * (1.f - progress));
@@ -258,11 +220,11 @@ void drawImpactEffect(sf::RenderWindow& window, float x, float y, float progress
     }
 }
 
-// Draws a small robot: body, head, antenna, eyes, arms, and hands. (x, y) is the
-// top-left of the overall bounding box, matching the old block's footprint,
-// so wheels/labels placed relative to it don't need to move.
+// ---------------------------------------------------------------------
+// Robot drawing: body, head, antenna, eyes, arms, hands
+// ---------------------------------------------------------------------
 void drawRobot(sf::RenderWindow& window, float x, float y, float size,
-                sf::Color color, char label, const sf::Font* font, bool fontLoaded) {
+               sf::Color color, char label, sf::Font& font, bool fontLoaded) {
     float bodyH = size * 0.7f;
     float bodyY = y + size * 0.3f;
 
@@ -281,7 +243,7 @@ void drawRobot(sf::RenderWindow& window, float x, float y, float size,
     armR.setOutlineColor(sf::Color::Black);
     window.draw(armR);
 
-    // Hands (at the bottom tip of each arm)
+    // Hands
     float handY = bodyY + bodyH * 0.15f + bodyH * 0.5f;
     sf::CircleShape handL(5.f);
     handL.setFillColor(sf::Color(60, 60, 65));
@@ -348,9 +310,9 @@ void drawRobot(sf::RenderWindow& window, float x, float y, float size,
     window.draw(pupilL);
     window.draw(pupilR);
 
-    // Chest label (A / B)
+    // Chest label
     if (fontLoaded) {
-        sf::Text text(std::string(1, label), *font, 16);
+        sf::Text text(std::string(1, label), font, 16);
         text.setFillColor(sf::Color::White);
         sf::FloatRect b = text.getLocalBounds();
         text.setPosition(x + size / 2.f - b.width / 2.f - b.left,
@@ -359,6 +321,9 @@ void drawRobot(sf::RenderWindow& window, float x, float y, float size,
     }
 }
 
+// =====================================================================
+// main
+// =====================================================================
 int main() {
     const unsigned int WIDTH = 800, HEIGHT = 540;
     sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Robot Collision Detection and Response Simulator");
@@ -380,40 +345,35 @@ int main() {
     track.setPosition(trackXStart, trackY + blockSize);
     track.setFillColor(sf::Color(120, 120, 110));
 
-    // --- UI controls ---
-    Slider velASlider(sf::Vector2f(60.f, 430.f), 220.f, -3.f, 3.f, -1.5f, "A");
-    Slider velBSlider(sf::Vector2f(320.f, 430.f), 220.f, -3.f, 3.f, 1.5f, "B");
-    Slider speedSlider(sf::Vector2f(580.f, 430.f), 160.f, 0.2f, 4.f, 1.5f, "Speed", "x");
+    // --- UI controls (plain data, no classes) ---
+    SliderData velASlider = { 60.f, 430.f, 220.f, -3.f, 3.f, -1.5f, false, "A", "m/s" };
+    SliderData velBSlider = { 320.f, 430.f, 220.f, -3.f, 3.f, 1.5f, false, "B", "m/s" };
+    SliderData speedSlider = { 580.f, 430.f, 160.f, 0.2f, 4.f, 1.5f, false, "Speed", "x" };
 
-    Button elasticBtn(sf::Vector2f(60.f, 470.f), sf::Vector2f(150.f, 34.f), "Elastic");
-    Button inelasticBtn(sf::Vector2f(220.f, 470.f), sf::Vector2f(180.f, 34.f), "Perfectly inelastic");
-    Button resetBtn(sf::Vector2f(650.f, 470.f), sf::Vector2f(90.f, 34.f), "Reset");
+    ButtonData elasticBtn = { 60.f, 470.f, 150.f, 34.f, "Elastic", true };
+    ButtonData inelasticBtn = { 220.f, 470.f, 180.f, 34.f, "Perfectly inelastic", false };
+    ButtonData resetBtn = { 650.f, 470.f, 90.f, 34.f, "Reset", false };
 
-    IconButton playPauseBtn(sf::Vector2f(700.f, 60.f), 40.f);
+    const float playBtnX = 700.f, playBtnY = 60.f, playBtnSize = 40.f;
 
     bool elasticMode = true;
-    elasticBtn.setActive(true);
-    inelasticBtn.setActive(false);
 
     // --- Simulation state ---
     float posA, posB, velA, velB;
-    bool playing = true;   // runs continuously by default
+    bool playing = true;
     std::string statusText = "No collision on this track";
 
     // Impact animation state
     const float impactDuration = 0.4f;
-    float impactTimer = 0.f;   // counts down from impactDuration to 0
+    float impactTimer = 0.f;
     bool showImpact = false;
     float impactX = 0.f, impactY = 0.f;
 
-    auto resetSim = [&]() {
-        posA = trackXStart + 60.f;
-        posB = trackXEnd - 60.f - blockSize;
-        velA = velASlider.getValue();
-        velB = velBSlider.getValue();
-        statusText = "No collision on this track";
-    };
-    resetSim();
+    // Reset positions/velocities back to the slider values
+    posA = trackXStart + 60.f;
+    posB = trackXEnd - 60.f - blockSize;
+    velA = velASlider.value;
+    velB = velBSlider.value;
 
     sf::Clock clock;
 
@@ -422,71 +382,63 @@ int main() {
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) window.close();
 
-            velASlider.handleEvent(event, window);
-            velBSlider.handleEvent(event, window);
-            speedSlider.handleEvent(event, window);
+            updateSlider(velASlider, event, window);
+            updateSlider(velBSlider, event, window);
+            updateSlider(speedSlider, event, window);
 
-            if (elasticBtn.isClicked(event, window)) {
+            if (isButtonClicked(elasticBtn, event, window)) {
                 elasticMode = true;
-                elasticBtn.setActive(true);
-                inelasticBtn.setActive(false);
+                elasticBtn.active = true;
+                inelasticBtn.active = false;
             }
-            if (inelasticBtn.isClicked(event, window)) {
+            if (isButtonClicked(inelasticBtn, event, window)) {
                 elasticMode = false;
-                elasticBtn.setActive(false);
-                inelasticBtn.setActive(true);
+                elasticBtn.active = false;
+                inelasticBtn.active = true;
             }
-            if (playPauseBtn.isClicked(event, window)) {
+            if (isIconButtonClicked(playBtnX, playBtnY, playBtnSize, event, window)) {
                 playing = !playing;
             }
-            if (resetBtn.isClicked(event, window)) {
-                resetSim();
+            if (isButtonClicked(resetBtn, event, window)) {
+                posA = trackXStart + 60.f;
+                posB = trackXEnd - 60.f - blockSize;
+                velA = velASlider.value;
+                velB = velBSlider.value;
+                statusText = "No collision on this track";
+                showImpact = false;
             }
         }
 
         float rawDt = clock.restart().asSeconds();
         if (rawDt > 0.033f) rawDt = 0.033f;
-        float dt = rawDt * speedSlider.getValue();
+        float dt = rawDt * speedSlider.value;
 
         // While the user is actively dragging a velocity slider, let it
         // control the live velocity in real time.
-        if (velASlider.isDragging()) velA = velASlider.getValue();
-        if (velBSlider.isDragging()) velB = velBSlider.getValue();
+        if (velASlider.dragging) velA = velASlider.value;
+        if (velBSlider.dragging) velB = velBSlider.value;
 
         if (playing) {
             posA += velA * pxPerMps * dt;
             posB += velB * pxPerMps * dt;
 
             // Bounce off the ends of the track so motion never stops
-            if (posA < trackXStart) {
-                posA = trackXStart;
-                velA = -velA;
-            }
-            if (posB + blockSize > trackXEnd) {
-                posB = trackXEnd - blockSize;
-                velB = -velB;
-            }
-            if (posB < trackXStart) {
-                posB = trackXStart;
-                velB = -velB;
-            }
-            if (posA + blockSize > trackXEnd) {
-                posA = trackXEnd - blockSize;
-                velA = -velA;
-            }
+            if (posA < trackXStart) { posA = trackXStart; velA = -velA; }
+            if (posB + blockSize > trackXEnd) { posB = trackXEnd - blockSize; velB = -velB; }
+            if (posB < trackXStart) { posB = trackXStart; velB = -velB; }
+            if (posA + blockSize > trackXEnd) { posA = trackXEnd - blockSize; velA = -velA; }
 
-            // Keep A left of B for collision math to make sense; if they
-            // pass through each other's positions treat it the same way.
+            // Keep A left of B for collision math to make sense
             float leftPos = std::min(posA, posB);
             float rightPos = std::max(posA, posB);
             bool aIsLeft = (posA <= posB);
 
             float gap = rightPos - (leftPos + blockSize);
             if (gap <= 0.f) {
-                float& leftVel  = aIsLeft ? velA : velB;
-                float& rightVel = aIsLeft ? velB : velA;
                 float leftMass  = aIsLeft ? massA : massB;
                 float rightMass = aIsLeft ? massB : massA;
+                float leftVel   = aIsLeft ? velA : velB;
+                float rightVel  = aIsLeft ? velB : velA;
 
                 float relVel = rightVel - leftVel; // along +x
                 if (relVel < 0.f) {
@@ -495,11 +447,14 @@ int main() {
                     leftVel  -= j / leftMass;
                     rightVel += j / rightMass;
 
+                    // Write the updated velocities back to the real variables
+                    if (aIsLeft) { velA = leftVel; velB = rightVel; }
+                    else         { velB = leftVel; velA = rightVel; }
+
                     statusText = elasticMode
                         ? "Elastic collision - velocities exchanged"
                         : "Perfectly inelastic collision - blocks move together";
 
-                    // Trigger the impact spark animation at the contact point
                     showImpact = true;
                     impactTimer = impactDuration;
                     impactX = leftPos + blockSize;
@@ -517,33 +472,30 @@ int main() {
 
         if (showImpact) {
             impactTimer -= rawDt;
-            if (impactTimer <= 0.f) {
-                impactTimer = 0.f;
-                showImpact = false;
-            }
+            if (impactTimer <= 0.f) { impactTimer = 0.f; showImpact = false; }
         }
 
         window.clear(sf::Color(35, 35, 45));
 
         window.draw(track);
 
-        // Wheels (small dots under each robot)
+        // Wheels
         sf::CircleShape wheel(4.f);
         wheel.setFillColor(sf::Color(40, 40, 40));
 
-        drawRobot(window, posA, trackY, blockSize, sf::Color(50, 120, 220), 'A', &font, fontLoaded);
+        drawRobot(window, posA, trackY, blockSize, sf::Color(50, 120, 220), 'A', font, fontLoaded);
         wheel.setPosition(posA + blockSize * 0.25f, trackY + blockSize + 2.f);
         window.draw(wheel);
         wheel.setPosition(posA + blockSize * 0.65f, trackY + blockSize + 2.f);
         window.draw(wheel);
 
-        drawRobot(window, posB, trackY, blockSize, sf::Color(60, 170, 90), 'B', &font, fontLoaded);
+        drawRobot(window, posB, trackY, blockSize, sf::Color(60, 170, 90), 'B', font, fontLoaded);
         wheel.setPosition(posB + blockSize * 0.25f, trackY + blockSize + 2.f);
         window.draw(wheel);
         wheel.setPosition(posB + blockSize * 0.65f, trackY + blockSize + 2.f);
         window.draw(wheel);
 
-        // Velocity arrows above each block
+        // Velocity arrows
         drawVelocityArrow(window, posA + blockSize / 2.f, trackY - 45.f, velA, sf::Color(90, 150, 240));
         drawVelocityArrow(window, posB + blockSize / 2.f, trackY - 45.f, velB, sf::Color(100, 200, 130));
 
@@ -597,13 +549,13 @@ int main() {
             window.draw(title);
         }
 
-        velASlider.draw(window, fontLoaded ? &font : nullptr);
-        velBSlider.draw(window, fontLoaded ? &font : nullptr);
-        speedSlider.draw(window, fontLoaded ? &font : nullptr);
-        elasticBtn.draw(window, fontLoaded ? &font : nullptr);
-        inelasticBtn.draw(window, fontLoaded ? &font : nullptr);
-        resetBtn.draw(window, fontLoaded ? &font : nullptr);
-        playPauseBtn.draw(window, playing);
+        drawSlider(window, velASlider, font, fontLoaded);
+        drawSlider(window, velBSlider, font, fontLoaded);
+        drawSlider(window, speedSlider, font, fontLoaded);
+        drawButton(window, elasticBtn, font, fontLoaded);
+        drawButton(window, inelasticBtn, font, fontLoaded);
+        drawButton(window, resetBtn, font, fontLoaded);
+        drawIconButton(window, playBtnX, playBtnY, playBtnSize, playing);
 
         window.display();
     }
